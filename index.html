@@ -9,13 +9,17 @@
       --bg: #0f172a;
       --panel: #111827;
       --panel-2: #1f2937;
+      --panel-3: #0f172a;
       --text: #e5e7eb;
       --muted: #94a3b8;
       --accent: #7c3aed;
       --accent-2: #22c55e;
+      --accent-3: #38bdf8;
+      --danger: #fb7185;
       --border: #334155;
       --code-bg: #0b1120;
-      --maxw: 1120px;
+      --maxw: 1160px;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
     }
 
     * { box-sizing: border-box; }
@@ -52,7 +56,7 @@
 
     .hero p {
       margin: 0;
-      max-width: 820px;
+      max-width: 860px;
       color: var(--muted);
       font-size: 1.02rem;
     }
@@ -94,10 +98,15 @@
       white-space: nowrap;
       color: var(--muted);
       font-size: 0.95rem;
+      padding-bottom: 3px;
+      border-bottom: 2px solid transparent;
     }
 
-    nav.toc a:hover {
+    nav.toc a:hover,
+    nav.toc a.active {
       color: white;
+      border-bottom-color: var(--accent-3);
+      text-decoration: none;
     }
 
     main {
@@ -110,7 +119,7 @@
       background: rgba(17, 24, 39, 0.85);
       border: 1px solid rgba(148, 163, 184, 0.16);
       border-radius: 20px;
-      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.18);
+      box-shadow: var(--shadow);
     }
 
     section h2 {
@@ -133,6 +142,11 @@
 
     .muted {
       color: var(--muted);
+    }
+
+    .lead {
+      font-size: 1.03rem;
+      color: #e2e8f0;
     }
 
     .grid {
@@ -161,6 +175,55 @@
       font-size: 1rem;
     }
 
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .kpi {
+      background: linear-gradient(180deg, rgba(124, 58, 237, 0.14), rgba(15, 23, 42, 0.78));
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .kpi .label {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 6px;
+    }
+
+    .kpi .value {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #faf5ff;
+      line-height: 1.2;
+    }
+
+    .kpi .note {
+      margin-top: 6px;
+      color: #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent-3);
+      background: rgba(15, 23, 42, 0.55);
+      border-radius: 12px;
+      color: #e2e8f0;
+    }
+
+    .figure-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 14px;
+    }
+
     .figure-box {
       margin-top: 14px;
       border: 1px dashed rgba(148, 163, 184, 0.35);
@@ -174,6 +237,25 @@
     .figure-box img {
       max-width: 100%;
       border-radius: 12px;
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .figure-title {
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+
+    .figure-caption {
+      font-size: 0.94rem;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    .result-table-wrap {
+      overflow-x: auto;
+      margin-top: 14px;
     }
 
     table {
@@ -199,6 +281,18 @@
     tr:nth-child(even) td {
       background: rgba(255, 255, 255, 0.02);
     }
+
+    .result-table th:first-child,
+    .result-table td:first-child {
+      position: sticky;
+      left: 0;
+      background: rgba(17, 24, 39, 0.98);
+      z-index: 1;
+    }
+
+    .coef-pos { color: #86efac; font-weight: 600; }
+    .coef-neg { color: #fda4af; font-weight: 600; }
+    .sig { color: #fde68a; font-weight: 700; }
 
     pre {
       margin: 0;
@@ -234,6 +328,11 @@
       color: #f8fafc;
     }
 
+    .two-col-text {
+      columns: 2;
+      column-gap: 28px;
+    }
+
     footer {
       padding: 36px 0 70px;
       color: var(--muted);
@@ -254,11 +353,20 @@
       box-shadow: 0 8px 20px rgba(124, 58, 237, 0.35);
     }
 
-    @media (max-width: 860px) {
-      .grid-2, .grid-3 {
+    @media (max-width: 980px) {
+      .kpi-grid,
+      .grid-3,
+      .grid-2,
+      .figure-grid {
         grid-template-columns: 1fr;
       }
 
+      .two-col-text {
+        columns: 1;
+      }
+    }
+
+    @media (max-width: 860px) {
       section {
         padding: 20px;
       }
@@ -284,13 +392,35 @@
     <div class="container">
       <h1>戀與深空卡池流水分析</h1>
       <p>
-        本報告以《戀與深空》為研究對象，結合七麥數據 iPhone 每日預估收益、手動整理之卡池事件資料，以及 Bilibili 主 PV 評論資料，分析不同池種、角色、節日事件與社群討論結構如何影響卡池表現。
+        本報告以遊戲《戀與深空》為研究對象，結合七麥數據 iPhone 每日預估收益、手動整理之卡池事件資料，以及 Bilibili 主 PV 評論資料，分析不同池種、角色、節日事件與社群討論結構如何影響卡池表現。
       </p>
       <div class="meta">
         <span class="tag">資料分析專題</span>
         <span class="tag">GitHub Pages</span>
         <span class="tag">R + HTML</span>
         <span class="tag">戀與深空</span>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">研究期間</div>
+          <div class="value">2024.01–2026.06</div>
+          <div class="note">可替換成最終樣本期間</div>
+        </div>
+        <div class="kpi">
+          <div class="label">主要收益資料</div>
+          <div class="value">iPhone 日收益</div>
+          <div class="note">七麥數據估計值</div>
+        </div>
+        <div class="kpi">
+          <div class="label">事件單位</div>
+          <div class="value">卡池活動</div>
+          <div class="note">含 moon / sun / return / roulette</div>
+        </div>
+        <div class="kpi">
+          <div class="label">社群資料</div>
+          <div class="value">Bilibili 評論</div>
+          <div class="note">主 PV 預熱期評論</div>
+        </div>
       </div>
     </div>
   </header>
@@ -300,9 +430,13 @@
 
       <section id="intro">
         <h2>一、摘要</h2>
-        <p>
+        <p class="lead">
           這裡放 150–300 字左右的摘要。建議內容包括：研究動機、資料來源、主要方法、核心發現。例如：單人月卡是否存在角色固定效果、Bilibili 評論中的有效熱度是否比原始熱度更能解釋流水等。
         </p>
+        <div class="callout">
+          <strong>研究對象與玩家語境說明（可直接引用或改寫）</strong><br>
+          《戀與深空》是一款結合戀愛互動、角色養成與限定抽卡活動的女性向遊戲。對玩家而言，每次卡池不只是新內容上線，也是角色魅力、劇情張力、卡面設計與課金決策同時發生作用的消費事件。因此，卡池開始前的社群討論熱度、評論內容結構與玩家情緒反應，具有作為卡池流水前置信號的研究價值。
+        </div>
       </section>
 
       <section id="question">
@@ -513,7 +647,7 @@ events_clean &lt;- events_clean %&gt;%
 
         <h3>5.1 樣本切法</h3>
         <p>
-          主分析先聚焦於非復刻的主排期卡池，並視研究問題分成單人月卡、混池月卡與單人日卡進行分析。此作法可避免不同抽卡結構混合造成模型解釋偏誤。
+          主分析先聚焦於非復刻的主排期卡池，並視研究問題分成單人月卡、混池月卡與單人日卡進行分析，避免不同抽卡結構混合造成模型解釋偏誤。
         </p>
 
         <h3>5.2 事件級變數</h3>
@@ -596,35 +730,205 @@ summary(m2)</code></pre>
         <h2>七、結果呈現</h2>
 
         <h3>7.1 描述統計</h3>
-        <div class="figure-box">
-          這裡放描述統計表、各池種平均收益表，或直接嵌入輸出的 PNG / SVG 圖表。
+        <div class="figure-grid">
+          <div class="figure-box">
+            <div class="figure-title">圖 1．研究期間每日收益趨勢</div>
+            <img src="img/figure1_revenue_trend.png" alt="研究期間每日收益趨勢圖預留位置">
+            <div class="figure-caption">可放每日收益時間序列圖，搭配主要活動上線節點。若尚未輸出圖表，可先保留這個位置。</div>
+          </div>
+          <div class="figure-box">
+            <div class="figure-title">圖 2．不同池種的平均收益比較</div>
+            <img src="img/figure2_pooltype_compare.png" alt="不同池種平均收益比較圖預留位置">
+            <div class="figure-caption">建議用長條圖或箱型圖比較 moon、sun、return、roulette 的收益分布。</div>
+          </div>
+        </div>
+
+        <div class="result-table-wrap">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>池種</th>
+                <th>樣本數</th>
+                <th>D1 平均收益</th>
+                <th>D3 平均收益</th>
+                <th>平均 abnormal D1</th>
+                <th>說明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>moon</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>主排期池，通常作為主分析對象</td>
+              </tr>
+              <tr>
+                <td>sun</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>日卡抽卡強度高，與月卡分開討論</td>
+              </tr>
+              <tr>
+                <td>return</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>復刻池通常不占主排期</td>
+              </tr>
+              <tr>
+                <td>4-star_roulutte</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>樣本少、制度位置特殊</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <h3>7.2 單人月卡不同男主效果</h3>
-        <div class="figure-box">
-          建議放：箱型圖、平均值長條圖、ANOVA / OLS 結果摘要表。
+        <div class="figure-grid">
+          <div class="figure-box">
+            <div class="figure-title">圖 3．單人月卡不同男主 D1 收益箱型圖</div>
+            <img src="img/figure3_malelead_boxplot.png" alt="單人月卡不同男主 D1 收益箱型圖預留位置">
+            <div class="figure-caption">建議用箱型圖呈現不同男主的收益分布，搭配 ANOVA 或 Kruskal-Wallis 檢定結果。</div>
+          </div>
+          <div class="figure-box">
+            <div class="figure-title">圖 4．單人月卡不同男主平均收益</div>
+            <img src="img/figure4_malelead_bar.png" alt="單人月卡不同男主平均收益圖預留位置">
+            <div class="figure-caption">可用平均值或中位數長條圖輔助說明角色固定效果。</div>
+          </div>
+        </div>
+
+        <div class="result-table-wrap">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>模型</th>
+                <th>基準組</th>
+                <th>男主變數</th>
+                <th>新角色變數</th>
+                <th>控制變數</th>
+                <th>Adj. R²</th>
+                <th>結論摘要</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Model 1</td>
+                <td>待填</td>
+                <td><span class="coef-pos">待填</span></td>
+                <td>-</td>
+                <td>無</td>
+                <td>待填</td>
+                <td>基礎角色效果檢定</td>
+              </tr>
+              <tr>
+                <td>Model 2</td>
+                <td>待填</td>
+                <td><span class="coef-pos">待填</span></td>
+                <td><span class="coef-pos">待填</span></td>
+                <td>節日、版本、overlap</td>
+                <td>待填</td>
+                <td>控制活動背景後的角色效果</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <h3>7.3 加入 Bilibili 評論特徵後的模型比較</h3>
-        <div class="figure-box">
-          建議放：baseline model、去水熱度模型、有效熱度模型的比較表（例如 adjusted R²、AIC）。
+        <div class="figure-grid">
+          <div class="figure-box">
+            <div class="figure-title">圖 5．原始熱度與收益關係</div>
+            <img src="img/figure5_raw_heat_vs_revenue.png" alt="原始熱度與收益關係圖預留位置">
+            <div class="figure-caption">可用散點圖觀察 comments_prelaunch_total 與 D1 / D3 收益之間的關係。</div>
+          </div>
+          <div class="figure-box">
+            <div class="figure-title">圖 6．有效熱度與收益關係</div>
+            <img src="img/figure6_effective_heat_vs_revenue.png" alt="有效熱度與收益關係圖預留位置">
+            <div class="figure-caption">可用散點圖或係數圖呈現 pull_intent_ratio、substantive_comment_ratio 等變數的影響。</div>
+          </div>
+        </div>
+
+        <div class="result-table-wrap">
+          <table class="result-table">
+            <thead>
+              <tr>
+                <th>模型</th>
+                <th>主要新增變數</th>
+                <th>關鍵係數方向</th>
+                <th>顯著性</th>
+                <th>Adj. R²</th>
+                <th>AIC</th>
+                <th>解讀</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Baseline</td>
+                <td>池種、角色、節日、overlap</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>基準模型</td>
+              </tr>
+              <tr>
+                <td>Model A</td>
+                <td>原始熱度</td>
+                <td><span class="coef-pos">待填</span></td>
+                <td><span class="sig">待填</span></td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>測試原始討論量是否能解釋流水</td>
+              </tr>
+              <tr>
+                <td>Model B</td>
+                <td>去水熱度</td>
+                <td><span class="coef-pos">待填</span></td>
+                <td><span class="sig">待填</span></td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>測試去除灌水/儀式性留言後的解釋力</td>
+              </tr>
+              <tr>
+                <td>Model C</td>
+                <td>有效熱度</td>
+                <td><span class="coef-pos">待填</span></td>
+                <td><span class="sig">待填</span></td>
+                <td>待填</td>
+                <td>待填</td>
+                <td>測試抽卡意圖與實質評論是否更接近消費轉化</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
       <section id="discussion">
         <h2>八、討論與限制</h2>
         <h3>8.1 討論</h3>
-        <ul>
-          <li>角色固定效果是否顯著？</li>
-          <li>新男主是否確實存在短期新鮮感紅利？</li>
-          <li>原始熱度與有效熱度哪個更能解釋流水？</li>
-        </ul>
+        <div class="two-col-text">
+          <p>
+            這裡可以討論：角色固定效果是否顯著、秦徹與夏以晝是否存在短期新鮮感紅利、月卡與日卡是否因抽卡制度不同而呈現不同的收益結構，以及 Bilibili 評論中的原始熱度與有效熱度哪一種更接近卡池的實際消費轉化。
+          </p>
+          <p>
+            若你的結果顯示角色效果顯著，則可進一步主張：在分析社群討論度對流水的影響之前，必須先控制角色固定效果，否則很容易把角色本身的吸引力誤判為 PV 預熱聲量的影響。若有效熱度比原始熱度更穩定，也可以說明玩家社群中的「大量留言」未必等同於「高購買意圖」。
+          </p>
+        </div>
 
         <h3>8.2 研究限制</h3>
         <ul>
-          <li>七麥收益為第三方估計值，並非官方實收。</li>
-          <li>Bilibili 評論可能受到平台文化、接運留言與刪評等因素影響。</li>
-          <li>部分事件變數如輿論背景含研究者手動整理成分，故僅作輔助控制。</li>
+          <li>七麥收益為第三方估計值，並非官方實收，因此更適合用於相對比較而非絕對金額推估。</li>
+          <li>Bilibili 評論可能受到平台文化、接運留言、控評或刪評影響，因此需要以去水與有效熱度指標輔助辨識。</li>
+          <li>部分事件變數如 public opinion 含研究者手動整理成分，因此較適合作為輔助控制，而非主識別來源。</li>
+          <li>少數特殊池種如四星轉盤卡樣本數有限，推論應以探索性結果理解。</li>
         </ul>
       </section>
 
@@ -667,6 +971,21 @@ summary(m2)</code></pre>
     topBtn.addEventListener('click', () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    const tocLinks = document.querySelectorAll('.toc a');
+    const sections = document.querySelectorAll('main section[id]');
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          tocLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+          });
+        }
+      });
+    }, { threshold: 0.35 });
+
+    sections.forEach(section => observer.observe(section));
   </script>
 </body>
 </html>
