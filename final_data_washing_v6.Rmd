@@ -1,0 +1,657 @@
+---
+title: "<center>Final Project Data Cleaing</center>"
+author: "<center>111071033</center>"
+output:
+  html_document: 
+    theme: darkly
+    highlight: monochrome
+    df_print: paged
+    toc: true
+    toc_float: true
+    css: style.css
+  html_notebook: 
+    theme: darkly
+    highlight: monochrome
+    df_print: paged
+    toc: true
+    toc_float: true
+    css: style.css
+    code_folding: show
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      collapse = FALSE,
+                      comment = "",
+                      fig.height = 5,
+                      fig.width = 10.4,
+                      class.output = ".codeout")
+#theme_set(theme_bw())
+```
+|
+|
+## Prepare Requisite
+
+### load package
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(stringr)
+library(tidyr)
+library(purrr)
+```
+
+
+### load file
+```{r}
+revenue_raw <- read_csv("lysk_iphone_revenue_20240118_20260615.csv")
+events_raw  <- read_excel("lysk_pull_event_info.xlsx")
+```
+
+
+## data cleaning
+### clean daily revenue data
+```{r}
+revenue_daily_clean <- revenue_raw |> 
+  transmute(
+    date = ymd(`日期`),
+    revenue_ios = as.numeric(`收入预估~iPhone`)
+  ) |> 
+  filter(!is.na(date), !is.na(revenue_ios)) |> 
+  arrange(date) |> 
+  mutate(
+    log_revenue_ios = log(revenue_ios + 1),
+    year = year(date),
+    month = month(date),
+    week = isoweek(date),
+    weekday = wday(date, label = TRUE, week_start = 1),
+    is_weekend = weekday %in% c("Sat", "Sun","周六","周日")
+  )
+
+glimpse(revenue_daily_clean)
+summary(revenue_daily_clean$revenue_ios)
+```
+
+### clean pull event data
+```{r}
+events_clean <- events_raw |> 
+  transmute(
+    event_id = row_number(),
+    event_name = event_name,
+    pv_upload_date = ymd(pv_upload_date),
+    event_start = ymd(event_start),
+    event_end = ymd(event_end),
+    type = type,
+    pool_scope = `single/all`,
+    is_return = is_return,
+    character_include = character_include,
+    special_holiday = special_holiday,
+    public_opinion = public_opinion
+  ) |> 
+  mutate(
+    event_duration_days = as.integer(event_end - event_start) + 1,
+    pv_to_start_days = as.integer(event_start - pv_upload_date),
+
+    is_moon = type == "moon",
+    is_sun = type == "sun",
+    is_roulette = type == "4-star_roulutte",
+
+    is_single = pool_scope == "single",
+    is_all = pool_scope == "all",
+
+    is_return_dummy = is_return == "Y",
+
+    # 統一角色分隔符
+    character_include_std = character_include |> 
+      str_replace_all("、|，", ",") |> 
+      str_replace_all("\\s+", ""),
+
+    n_characters = if_else(
+      is.na(character_include_std) | character_include_std == "",
+      0L,
+      str_count(character_include_std, ",") + 1L
+    )
+  )
+
+glimpse(events_clean)
+```
+
+### seperate character_include_std into dummy columns
+```{r}
+events_clean <- events_clean |> 
+  mutate(
+    has_shenxinghui = str_detect(coalesce(character_include_std, ""), "沈星回"),
+    has_lishen = str_detect(coalesce(character_include_std, ""), "黎深"),
+    has_qiyu = str_detect(coalesce(character_include_std, ""), "祁煜"),
+    has_qinche = str_detect(coalesce(character_include_std, ""), "秦徹"),
+    has_xiayizhou = str_detect(coalesce(character_include_std, ""), "夏以晝")
+  )
+```
+
+### seperate and label special_holiday
+```{r}
+events_clean <- events_clean |> 
+  mutate(
+    special_holiday = replace_na(special_holiday, "N"),
+
+    is_birthday = str_detect(special_holiday, "角色生日|生日"),
+
+    is_special_holiday = str_detect(
+      special_holiday,
+      "情人節|白色情人節|五一|國慶|農曆新年|七夕"
+    ),
+
+    is_anniversary = str_detect(
+      special_holiday,
+      "一周年|二周年|周年"
+    ),
+
+    is_new_version = str_detect(
+      special_holiday,
+      "版本更新|新增男主|開服"
+    ),
+
+    holiday_label = case_when(
+      is_birthday ~ "birthday",
+      is_anniversary ~ "anniversary",
+      is_new_version ~ "new_version",
+      is_special_holiday ~ "special_holiday",
+      TRUE ~ "none"
+    )
+  )
+
+events_clean |> 
+  count(special_holiday, holiday_label, sort = TRUE)
+```
+
+### seperate and label public_opinion
+```{r}
+events_clean <- events_clean |> 
+  mutate(
+    public_opinion = replace_na(public_opinion, "none"),
+
+    opinion_none = public_opinion == "none",
+
+    opinion_negative = str_detect(
+      public_opinion,
+      "停氪維權|洩憤|負面|炎上|罵|不滿"
+    ),
+
+    opinion_positive_hype = str_detect(
+      public_opinion,
+      "狂熱|高討論|爆|熱度|出圈"
+    ),
+
+    opinion_external_conflict = str_detect(
+      public_opinion,
+      "rap圈|塵白禁區|外部風波|圈外"
+    ),
+
+    opinion_controversy = str_detect(
+      public_opinion,
+      "爭議|尺度|主題爭議|風波"
+    )
+  )
+```
+
+
+### label new character(male_lead) debut period
+```{r}
+qinche_first_date <- events_clean |> 
+  filter(event_name == "不设防禁区") |> 
+  pull(event_start) |> 
+  first()
+
+xiayizhou_first_date <- events_clean |> 
+  filter(event_name == "触痛讯号") |> 
+  pull(event_start) |> 
+  first()
+
+events_clean <- events_clean |> 
+  mutate(
+    is_qinche_fresh_period =
+      is_single &
+      has_qinche &
+      event_start >= qinche_first_date &
+      event_start < qinche_first_date %m+% months(3),
+
+    is_xiayizhou_fresh_period =
+      is_single &
+      has_xiayizhou &
+      event_start >= xiayizhou_first_date &
+      event_start < xiayizhou_first_date %m+% months(3),
+
+    is_new_character =
+      is_qinche_fresh_period | is_xiayizhou_fresh_period,
+
+    days_since_qinche_debut = if_else(
+      has_qinche,
+      as.integer(event_start - qinche_first_date),
+      NA_integer_
+    ),
+
+    days_since_xiayizhou_debut = if_else(
+      has_xiayizhou,
+      as.integer(event_start - xiayizhou_first_date),
+      NA_integer_
+    )
+  )
+```
+
+### exclude first event "心动变曲"
+```{r}
+first_xindong_date <- events_clean |> 
+  filter(event_name == "心动变曲") |> 
+  summarise(first_date = min(event_start, na.rm = TRUE)) |> 
+  pull(first_date)
+
+events_clean <- events_clean |> 
+  mutate(
+    is_first_launch_event =
+      event_name == "心动变曲" & event_start == first_xindong_date,
+
+    # 主分析只排首發心动变曲
+    exclude_main_analysis = is_first_launch_event,
+
+    # 核心主池分析再排 return
+    exclude_core_pool_analysis = is_first_launch_event | is_return_dummy
+  )
+
+events_clean |> 
+  select(
+    event_name, event_start, is_first_launch_event,
+    is_roulette, is_return_dummy,
+    exclude_main_analysis, exclude_core_pool_analysis
+  ) |> 
+  arrange(event_start)
+```
+
+### event-day panel
+```{r}
+event_day_panel <- events_clean |> 
+  mutate(date = map2(event_start, event_end, seq.Date, by = "day")) |> 
+  unnest(date) |> 
+  mutate(
+    event_day = as.integer(date - event_start),
+    is_active = TRUE,
+    is_event_start_day = event_day == 0,
+    is_event_day_0_2 = event_day %in% 0:2,
+    is_event_day_0_6 = event_day %in% 0:6
+  )
+```
+
+
+### daily event exposure
+```{r}
+daily_event_exposure <- event_day_panel |> 
+  group_by(date) |> 
+  summarise(
+    active_event_count = n(),
+
+    active_moon_count = sum(is_moon, na.rm = TRUE),
+    active_sun_count = sum(is_sun, na.rm = TRUE),
+    active_roulette_count = sum(is_roulette, na.rm = TRUE),
+    active_return_count = sum(is_return_dummy, na.rm = TRUE),
+
+    has_moon = active_moon_count > 0,
+    has_sun = active_sun_count > 0,
+    has_roulette = active_roulette_count > 0,
+    has_return = active_return_count > 0,
+
+    has_single = sum(is_single, na.rm = TRUE) > 0,
+    has_all = sum(is_all, na.rm = TRUE) > 0,
+
+    is_any_event_start = sum(is_event_start_day, na.rm = TRUE) > 0,
+    is_moon_start_day = sum(is_event_start_day & is_moon, na.rm = TRUE) > 0,
+    is_sun_start_day = sum(is_event_start_day & is_sun, na.rm = TRUE) > 0,
+    is_roulette_start_day = sum(is_event_start_day & is_roulette, na.rm = TRUE) > 0,
+    is_return_start_day = sum(is_event_start_day & is_return_dummy, na.rm = TRUE) > 0,
+
+    active_shenxinghui_count = sum(has_shenxinghui, na.rm = TRUE),
+    active_lishen_count = sum(has_lishen, na.rm = TRUE),
+    active_qiyu_count = sum(has_qiyu, na.rm = TRUE),
+    active_qinche_count = sum(has_qinche, na.rm = TRUE),
+    active_xiayizhou_count = sum(has_xiayizhou, na.rm = TRUE),
+
+    active_birthday_count = sum(is_birthday, na.rm = TRUE),
+    active_special_holiday_count = sum(is_special_holiday, na.rm = TRUE),
+    active_anniversary_count = sum(is_anniversary, na.rm = TRUE),
+    active_new_version_count = sum(is_new_version, na.rm = TRUE),
+
+    active_negative_opinion_count = sum(opinion_negative, na.rm = TRUE),
+    active_positive_hype_count = sum(opinion_positive_hype, na.rm = TRUE),
+    active_external_conflict_count = sum(opinion_external_conflict, na.rm = TRUE),
+    active_controversy_count = sum(opinion_controversy, na.rm = TRUE),
+
+    .groups = "drop"
+  )
+```
+
+### daily_panel
+```{r}
+daily_panel <- revenue_daily_clean |> 
+  left_join(daily_event_exposure, by = "date") |> 
+  mutate(
+    across(
+      c(
+        active_event_count,
+        active_moon_count,
+        active_sun_count,
+        active_roulette_count,
+        active_return_count,
+        active_shenxinghui_count,
+        active_lishen_count,
+        active_qiyu_count,
+        active_qinche_count,
+        active_xiayizhou_count,
+        active_birthday_count,
+        active_special_holiday_count,
+        active_anniversary_count,
+        active_new_version_count,
+        active_negative_opinion_count,
+        active_positive_hype_count,
+        active_external_conflict_count,
+        active_controversy_count
+      ),
+      ~ replace_na(., 0)
+    ),
+    across(
+      c(
+        has_moon, has_sun, has_roulette, has_return,
+        has_single, has_all,
+        is_any_event_start, is_moon_start_day, is_sun_start_day,
+        is_roulette_start_day, is_return_start_day
+      ),
+      ~ replace_na(., FALSE)
+    )
+  )
+```
+
+### event outcomes(general baseline)
+```{r}
+event_outcomes <- events_clean |> 
+  rowwise() |> 
+  mutate(
+    rev_d1 = revenue_daily_clean |> 
+      filter(date == event_start) |> 
+      pull(revenue_ios) |> 
+      first(),
+
+    rev_d3_sum = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(2)) |> 
+      summarise(x = sum(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    rev_d7_sum = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(6)) |> 
+      summarise(x = sum(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    rev_avg_d3 = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(2)) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    rev_avg_d7 = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(6)) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    baseline_pre3 = revenue_daily_clean |> 
+      filter(date >= event_start - days(3), date <= event_start - days(1)) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    baseline_pre7 = revenue_daily_clean |> 
+      filter(date >= event_start - days(7), date <= event_start - days(1)) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    abnormal_rev_d1 = rev_d1 - baseline_pre3,
+    abnormal_rev_d3_sum = rev_d3_sum - 3 * baseline_pre3,
+    abnormal_rev_d7_sum = rev_d7_sum - 7 * baseline_pre7,
+
+    log_rev_d1 = log(rev_d1 + 1),
+    log_rev_d3_sum = log(rev_d3_sum + 1),
+
+    log_abnormal_rev_d1 = log(pmax(abnormal_rev_d1, 0) + 1),
+    log_abnormal_rev_d3_sum = log(pmax(abnormal_rev_d3_sum, 0) + 1)
+  )
+```
+
+
+### clean baseline excluding "心动变曲"
+```{r}
+excluded_dates_for_baseline <- event_day_panel |> 
+  filter(is_first_launch_event) |> 
+  distinct(date) |> 
+  mutate(is_excluded_baseline_date = TRUE)
+
+revenue_daily_for_baseline <- revenue_daily_clean |> 
+  left_join(excluded_dates_for_baseline, by = "date") |> 
+  mutate(
+    is_excluded_baseline_date = replace_na(is_excluded_baseline_date, FALSE)
+  )
+```
+
+### event outcomes(clean baseline excluding "心动变曲")
+```{r}
+event_outcomes_clean_baseline <- events_clean |> 
+  rowwise() |> 
+  mutate(
+    rev_d1 = revenue_daily_clean |> 
+      filter(date == event_start) |> 
+      pull(revenue_ios) |> 
+      first(),
+
+    rev_d3_sum = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(2)) |> 
+      summarise(x = sum(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    rev_d7_sum = revenue_daily_clean |> 
+      filter(date >= event_start, date <= event_start + days(6)) |> 
+      summarise(x = sum(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    clean_pre3_n = revenue_daily_for_baseline |> 
+      filter(
+        date >= event_start - days(3),
+        date <= event_start - days(1),
+        !is_excluded_baseline_date
+      ) |> 
+      nrow(),
+
+    clean_pre7_n = revenue_daily_for_baseline |> 
+      filter(
+        date >= event_start - days(7),
+        date <= event_start - days(1),
+        !is_excluded_baseline_date
+      ) |> 
+      nrow(),
+
+    baseline_pre3_clean = revenue_daily_for_baseline |> 
+      filter(
+        date >= event_start - days(3),
+        date <= event_start - days(1),
+        !is_excluded_baseline_date
+      ) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x),
+
+    baseline_pre7_clean = revenue_daily_for_baseline |> 
+      filter(
+        date >= event_start - days(7),
+        date <= event_start - days(1),
+        !is_excluded_baseline_date
+      ) |> 
+      summarise(x = mean(revenue_ios, na.rm = TRUE)) |> 
+      pull(x)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    abnormal_rev_d1_clean = rev_d1 - baseline_pre3_clean,
+    abnormal_rev_d3_sum_clean = rev_d3_sum - 3 * baseline_pre3_clean,
+    abnormal_rev_d7_sum_clean = rev_d7_sum - 7 * baseline_pre7_clean,
+
+    log_abnormal_rev_d1_clean = log(pmax(abnormal_rev_d1_clean, 0) + 1),
+    log_abnormal_rev_d3_sum_clean = log(pmax(abnormal_rev_d3_sum_clean, 0) + 1),
+
+    baseline_clean_fallback = case_when(
+      !is.nan(baseline_pre3_clean) ~ baseline_pre3_clean,
+      !is.nan(baseline_pre7_clean) ~ baseline_pre7_clean,
+      TRUE ~ NA_real_
+    ),
+
+    abnormal_rev_d1_clean_fb = rev_d1 - baseline_clean_fallback,
+    abnormal_rev_d3_sum_clean_fb = rev_d3_sum - 3 * baseline_clean_fallback,
+
+    log_abnormal_rev_d1_clean_fb = log(pmax(abnormal_rev_d1_clean_fb, 0) + 1),
+    log_abnormal_rev_d3_sum_clean_fb = log(pmax(abnormal_rev_d3_sum_clean_fb, 0) + 1)
+  ) |> 
+  select(
+    event_id,
+    clean_pre3_n,
+    clean_pre7_n,
+    baseline_pre3_clean,
+    baseline_pre7_clean,
+    abnormal_rev_d1_clean,
+    abnormal_rev_d3_sum_clean,
+    abnormal_rev_d7_sum_clean,
+    log_abnormal_rev_d1_clean,
+    log_abnormal_rev_d3_sum_clean,
+    baseline_clean_fallback,
+    abnormal_rev_d1_clean_fb,
+    abnormal_rev_d3_sum_clean_fb,
+    log_abnormal_rev_d1_clean_fb,
+    log_abnormal_rev_d3_sum_clean_fb
+  )
+```
+
+### merge clean baseline back to event_outcomes
+```{r}
+event_outcomes <- event_outcomes |> 
+  select(
+    -any_of(c(
+      "clean_pre3_n",
+      "clean_pre7_n",
+      "baseline_pre3_clean",
+      "baseline_pre7_clean",
+      "abnormal_rev_d1_clean",
+      "abnormal_rev_d3_sum_clean",
+      "abnormal_rev_d7_sum_clean",
+      "log_abnormal_rev_d1_clean",
+      "log_abnormal_rev_d3_sum_clean",
+      "baseline_clean_fallback",
+      "abnormal_rev_d1_clean_fb",
+      "abnormal_rev_d3_sum_clean_fb",
+      "log_abnormal_rev_d1_clean_fb",
+      "log_abnormal_rev_d3_sum_clean_fb"
+    ))
+  ) |> 
+  left_join(event_outcomes_clean_baseline, by = "event_id")
+```
+
+
+### D1–D3 overlap
+```{r}
+event_windows_d3 <- events_clean |> 
+  transmute(
+    event_id,
+    event_name,
+    window_date = map(event_start, ~ seq(.x, .x + days(2), by = "day"))
+  ) |> 
+  unnest(window_date)
+```
+
+### overlap controls
+```{r}
+overlap_raw <- event_windows_d3 |> 
+  left_join(
+    event_day_panel |> 
+      transmute(
+        event_id_other = event_id,
+        date,
+        is_return_dummy,
+        is_roulette
+      ),
+    by = c("window_date" = "date"),
+    relationship = "many-to-many"
+  )
+
+overlap_info <- overlap_raw |> 
+  filter(event_id != event_id_other) |> 
+  mutate(
+    is_return_only = is_return_dummy & !is_roulette,
+    is_roulette_only = is_roulette & !is_return_dummy,
+    is_return_and_roulette = is_return_dummy & is_roulette
+  ) |> 
+  group_by(event_id) |> 
+  summarise(
+    overlap_days_d3 = n_distinct(window_date),
+    overlap_event_rows_d3 = n(),
+    overlap_return_rows_d3 = sum(is_return_dummy, na.rm = TRUE),
+    overlap_roulette_rows_d3 = sum(is_roulette, na.rm = TRUE),
+    overlap_return_only_rows_d3 = sum(is_return_only, na.rm = TRUE),
+    overlap_roulette_only_rows_d3 = sum(is_roulette_only, na.rm = TRUE),
+    overlap_return_and_roulette_rows_d3 = sum(is_return_and_roulette, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+### merge overlap info back to event_outcomes
+```{r}
+event_outcomes <- event_outcomes |> 
+  select(-starts_with("overlap_")) |> 
+  left_join(overlap_info, by = "event_id") |> 
+  mutate(
+    overlap_days_d3 = replace_na(overlap_days_d3, 0),
+    overlap_event_rows_d3 = replace_na(overlap_event_rows_d3, 0),
+    overlap_return_rows_d3 = replace_na(overlap_return_rows_d3, 0),
+    overlap_roulette_rows_d3 = replace_na(overlap_roulette_rows_d3, 0),
+    overlap_return_only_rows_d3 = replace_na(overlap_return_only_rows_d3, 0),
+    overlap_roulette_only_rows_d3 = replace_na(overlap_roulette_only_rows_d3, 0),
+    overlap_return_and_roulette_rows_d3 = replace_na(overlap_return_and_roulette_rows_d3, 0)
+  )
+```
+
+### 3 slice of sample
+```{r}
+event_outcomes_all <- event_outcomes
+
+event_outcomes_main <- event_outcomes |> 
+  filter(!exclude_main_analysis)
+
+event_outcomes_core <- event_outcomes |> 
+  filter(!exclude_core_pool_analysis)
+
+sample_overview <- tibble(
+  sample_name = c("all", "main", "core"),
+  n = c(
+    nrow(event_outcomes_all),
+    nrow(event_outcomes_main),
+    nrow(event_outcomes_core)
+  )
+)
+
+
+sample_overview
+```
+
+### save cleaned outcomes
+```{r}
+write_csv(revenue_daily_clean, "revenue_daily_clean.csv")
+write_csv(events_clean, "events_clean.csv")
+write_csv(event_day_panel, "event_day_panel.csv")
+write_csv(daily_panel, "daily_panel.csv")
+write_csv(event_outcomes, "event_outcomes.csv")
+write_csv(event_outcomes_all, "event_outcomes_all.csv")
+write_csv(event_outcomes_main, "event_outcomes_main.csv")
+write_csv(event_outcomes_core, "event_outcomes_core.csv")
+```
+
